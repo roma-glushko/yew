@@ -11,7 +11,7 @@ class ModFinder:
     def __init__(self) -> None:
         ...
 
-    def find(self, packages: Sequence[Path], *, follow_links: bool = False) -> Iterator[str]:
+    def find(self, packages: Sequence[Path], *, follow_links: bool = False) -> Iterator[Path]:
         """
         Find all Python files under the given packages
         """

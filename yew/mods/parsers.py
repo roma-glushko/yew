@@ -1,65 +1,62 @@
 import ast
-import dataclasses
+import importlib.util
 import tokenize
 from pathlib import Path
 from typing import Set
 
-
-@dataclasses.dataclass(frozen=True)
-class ImportReference:
-    module_name: str
-    lineno: int
-    col_offset: int
-
+from yew.collections import ModName, DirectImport
 
 class ImportParser:
     def __init__(self) -> None:
         ...
 
-    def __call__(self, node: ast.AST) -> Set[ImportReference]:
+    def __call__(self, node: ast.AST) -> Set[DirectImport]:
         """
         Parse `import x` statements
         """
         assert isinstance(node, ast.Import)
 
-        imported_modules: Set[ImportReference] = set()
+        imported_mods: Set[DirectImport] = set()
 
         for alias in node.names:
-            # TODO: Filter or process names if needed
-            imported_modules.add(ImportReference(
-                module_name=alias.name,
+            mod_name = ModName.from_str(alias.name)
+
+            imported_mods.add(DirectImport(
+                mod_name=mod_name,
+                path=mod_name.file_path,
                 lineno=node.lineno,
                 col_offset=node.col_offset,
             ))
 
-        return imported_modules
+        return imported_mods
 
 
 class ImportFromParser:
     def __init__(self) -> None:
         ...
 
-    def __call__(self, node: ast.AST) -> Set[ImportReference]:
+    def __call__(self, node: ast.AST) -> Set[DirectImport]:
         """
         Parse `from x import ...` statements
         """
         assert isinstance(node, ast.ImportFrom)
 
-        imported_modules: Set[ImportReference] = set()
+        imported_modules: Set[DirectImport] = set()
 
-        module_base: str = ""
+        base_module: str = ""
 
         if node.level == 0:
-            module_base = node.module
+            base_module = node.module
 
         if node.level >= 1:
-            module_base = "{up}"  # TODO: retrieve this from context
+            base_module = "services.users." + node.module  # TODO: retrieve this from context
 
         for alias in node.names:
-            imported_module = ".".join([module_base, alias.name])
+            mod_name, _ = ModName.from_object_path([base_module, alias.name])
 
-            imported_modules.add(ImportReference(
-                module_name=imported_module,
+            imported_modules.add(DirectImport(
+                mod_name=mod_name,
+                path=mod_name.file_path,
                 lineno=node.lineno,
                 col_offset=node.col_offset,
             ))
@@ -74,7 +71,7 @@ class ModParser:
             ast.ImportFrom: ImportFromParser(),
         }
 
-    def parse(self, module_path: Path) -> Set[str]:
+    def parse(self, module_path: Path) -> Set[DirectImport]:
         with tokenize.open(module_path) as file:
             content = file.read()
 
@@ -83,12 +80,12 @@ class ModParser:
         except SyntaxError as e:
             raise
 
-        module_imports: Set[str] = set()
+        imported_mods: Set[DirectImport] = set()
 
         for node in ast.walk(ast_tree):
             for node_class, node_parser in self._parsers.items():
                 if isinstance(node, node_class):
-                    module_imports |= node_parser(node)
+                    imported_mods |= node_parser(node)
                     continue
 
-        return module_imports
+        return imported_mods

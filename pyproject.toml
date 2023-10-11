@@ -8,6 +8,9 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = ">=3.7"
 
+[tool.poetry.extras]
+aiofiles = ["aiofiles"]
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
