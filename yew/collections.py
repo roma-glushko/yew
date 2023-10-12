@@ -19,13 +19,35 @@ class ModName:
         self._mod_parts = mod_parts
 
     @property
+    def parts(self) -> List[str]:
+        return self._mod_parts
+
+    @property
     def file_path(self) -> Path:
-        mod_spec = importlib.util.find_spec(str(self))
+        mod_spec = importlib.util.find_spec(str(self))  # type: ignore[attr-defined]
 
         if mod_spec.has_location:
             return Path(mod_spec.origin)
 
         return Path(mod_spec.loader_state.filename)
+
+    @property
+    def is_package(self) -> bool:
+        file_path = self.file_path
+
+        return file_path.stem == "__init__"
+
+    def resolve(self, level_up: int) -> "ModName":
+        return ModName(self._mod_parts[:-level_up])
+
+    def __truediv__(self, part) -> "ModName":
+        if isinstance(part, ModName):
+            return ModName([*self._mod_parts, part.parts])
+
+        if isinstance(part, str):
+            return ModName([*self._mod_parts, part])
+
+        raise NotImplementedError
 
     @classmethod
     def from_str(cls, mod_path: str) -> "ModName":
@@ -45,7 +67,7 @@ class ModName:
         original_obj_path = [*object_path]
 
         try:
-            importlib.util.find_spec(cls.join(object_path))
+            importlib.util.find_spec(cls.join(object_path))  # type: ignore[attr-defined]
 
             return cls(object_path), None
         except ModuleNotFoundError:
@@ -54,7 +76,7 @@ class ModName:
         object_name = object_path.pop()
 
         try:
-            importlib.util.find_spec(cls.join(object_path))
+            importlib.util.find_spec(cls.join(object_path))  # type: ignore[attr-defined]
 
             return cls(object_path), object_name
         except ModuleNotFoundError:
@@ -63,6 +85,10 @@ class ModName:
     @classmethod
     def join(cls, parts: List[str]) -> str:
         return cls.SEP.join(parts)
+
+    @classmethod
+    def split(cls, mod_name: str) -> List[str]:
+        return mod_name.split(cls.SEP)
 
     def __str__(self) -> str:
         return self.join(self._mod_parts)
@@ -117,10 +143,10 @@ class Module:
         return self._imported_by
 
     def add_imports(self, imports: Set[ImportContext]) -> None:
-        if not self._imports:
+        if self._imports is None:
             self._imports = set()
 
-        self.imports.update(imports)
+        self._imports.update(imports)
 
 
 class ModGraph:

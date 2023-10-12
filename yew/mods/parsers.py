@@ -1,16 +1,19 @@
 import ast
-import tokenize
-from pathlib import Path
-from typing import Set
+from typing import Any, Dict, List, Protocol, Set
 
 from yew.collections import DirectImport, ModName
+
+
+class Parser(Protocol):
+    def __call__(self, module_name: ModName, node: ast.AST) -> Set[DirectImport]:
+        ...
 
 
 class ImportParser:
     def __init__(self) -> None:
         ...
 
-    def __call__(self, node: ast.AST) -> Set[DirectImport]:
+    def __call__(self, mod_name: ModName, node: ast.AST) -> Set[DirectImport]:
         """
         Parse `import x` statements
         """
@@ -37,7 +40,7 @@ class ImportFromParser:
     def __init__(self) -> None:
         ...
 
-    def __call__(self, node: ast.AST) -> Set[DirectImport]:
+    def __call__(self, mod_name: ModName, node: ast.AST) -> Set[DirectImport]:
         """
         Parse `from x import ...` statements
         """
@@ -45,16 +48,21 @@ class ImportFromParser:
 
         imported_modules: Set[DirectImport] = set()
 
-        base_module: str = ""
+        base_module: List[str] = []
 
         if node.level == 0:
-            base_module = node.module
+            base_module = ModName.split(node.module)
 
         if node.level >= 1:
-            base_module = "services.users." + node.module  # TODO: retrieve this from context
+            level_up = node.level
+
+            if mod_name.is_package:
+                level_up -= 1
+
+            base_module = [*mod_name.resolve(level_up).parts, node.module]
 
         for alias in node.names:
-            mod_name, _ = ModName.from_object_path([base_module, alias.name])
+            mod_name, _ = ModName.from_object_path([*base_module, alias.name])
 
             imported_modules.add(
                 DirectImport(
@@ -70,15 +78,12 @@ class ImportFromParser:
 
 class ModParser:
     def __init__(self) -> None:
-        self._parsers = {
+        self._parsers: Dict[Any, Parser] = {
             ast.Import: ImportParser(),
             ast.ImportFrom: ImportFromParser(),
         }
 
-    def parse(self, module_path: Path) -> Set[DirectImport]:
-        with tokenize.open(module_path) as file:
-            content = file.read()
-
+    def parse(self, module_name: ModName, content: str) -> Set[DirectImport]:
         try:
             ast_tree = ast.parse(content)
         except SyntaxError:
@@ -89,7 +94,7 @@ class ModParser:
         for node in ast.walk(ast_tree):
             for node_class, node_parser in self._parsers.items():
                 if isinstance(node, node_class):
-                    imported_mods |= node_parser(node)
+                    imported_mods |= node_parser(module_name, node)
                     continue
 
         return imported_mods
