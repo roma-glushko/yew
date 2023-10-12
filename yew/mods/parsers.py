@@ -1,10 +1,10 @@
 import ast
-import importlib.util
 import tokenize
 from pathlib import Path
 from typing import Set
 
-from yew.collections import ModName, DirectImport
+from yew.collections import DirectImport, ModName
+
 
 class ImportParser:
     def __init__(self) -> None:
@@ -21,12 +21,14 @@ class ImportParser:
         for alias in node.names:
             mod_name = ModName.from_str(alias.name)
 
-            imported_mods.add(DirectImport(
-                mod_name=mod_name,
-                path=mod_name.file_path,
-                lineno=node.lineno,
-                col_offset=node.col_offset,
-            ))
+            imported_mods.add(
+                DirectImport(
+                    mod_name=mod_name,
+                    path=mod_name.file_path,
+                    lineno=node.lineno,
+                    col_offset=node.col_offset,
+                )
+            )
 
         return imported_mods
 
@@ -54,12 +56,14 @@ class ImportFromParser:
         for alias in node.names:
             mod_name, _ = ModName.from_object_path([base_module, alias.name])
 
-            imported_modules.add(DirectImport(
-                mod_name=mod_name,
-                path=mod_name.file_path,
-                lineno=node.lineno,
-                col_offset=node.col_offset,
-            ))
+            imported_modules.add(
+                DirectImport(
+                    mod_name=mod_name,
+                    path=mod_name.file_path,
+                    lineno=node.lineno,
+                    col_offset=node.col_offset,
+                )
+            )
 
         return imported_modules
 
@@ -77,7 +81,7 @@ class ModParser:
 
         try:
             ast_tree = ast.parse(content)
-        except SyntaxError as e:
+        except SyntaxError:
             raise
 
         imported_mods: Set[DirectImport] = set()

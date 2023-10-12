@@ -1,7 +1,7 @@
 import dataclasses
 import importlib
 from pathlib import Path
-from typing import Set, Dict, List, Final, Tuple
+from typing import Dict, Final, List, Set, Tuple
 
 
 @dataclasses.dataclass(frozen=True)
@@ -33,7 +33,7 @@ class ModName:
 
     @classmethod
     def from_path(cls, file_path: Path) -> "ModName":
-        mod_path = list(file_path.with_suffix('').parts)
+        mod_path = list(file_path.with_suffix("").parts)
 
         if mod_path[-1] == "__init__":
             mod_path.pop()
@@ -49,14 +49,16 @@ class ModName:
 
             return cls(object_path), None
         except ModuleNotFoundError:
-            object_name = object_path.pop()
+            pass
 
-            try:
-                importlib.util.find_spec(cls.join(object_path))
+        object_name = object_path.pop()
 
-                return cls(object_path), object_name
-            except ModuleNotFoundError:
-                raise ModuleNotFoundError(f"{cls.join(original_obj_path)} could not be found")
+        try:
+            importlib.util.find_spec(cls.join(object_path))
+
+            return cls(object_path), object_name
+        except ModuleNotFoundError:
+            raise ModuleNotFoundError(f"{cls.join(original_obj_path)} could not be found") from None
 
     @classmethod
     def join(cls, parts: List[str]) -> str:
@@ -66,7 +68,7 @@ class ModName:
         return self.join(self._mod_parts)
 
     def __repr__(self) -> str:
-        return f"\"{str(self)}\""
+        return f'"{str(self)}"'
 
 
 @dataclasses.dataclass(frozen=True)
@@ -74,6 +76,7 @@ class ImportContext:
     """
     A module import with code reference
     """
+
     lineno: int
     col_offset: int
     module: "Module"
@@ -152,17 +155,13 @@ class ModGraph:
                 imported_module = Module(direct_import.mod_name, direct_import.path)
                 self._unmet_nodes[direct_import.mod_name] = imported_module
 
-            imported_module.imported_by.add(ImportContext(
-                module=module,
-                lineno=direct_import.lineno,
-                col_offset=direct_import.col_offset
-            ))
+            imported_module.imported_by.add(
+                ImportContext(module=module, lineno=direct_import.lineno, col_offset=direct_import.col_offset)
+            )
 
-            mod_imports.add(ImportContext(
-                module=imported_module,
-                lineno=direct_import.lineno,
-                col_offset=direct_import.col_offset
-            ))
+            mod_imports.add(
+                ImportContext(module=imported_module, lineno=direct_import.lineno, col_offset=direct_import.col_offset)
+            )
 
         module.add_imports(mod_imports)
 

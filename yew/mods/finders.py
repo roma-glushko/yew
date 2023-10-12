@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Sequence, Iterator
+from typing import Iterator, Sequence
 
 
 class ModFinder:
