@@ -1,7 +1,10 @@
 import ast
+import logging
 from typing import Any, Dict, List, Protocol, Set
 
-from yew.collections import DirectImport, ModName
+from yew.collections import DirectImport, ModName, ModuleNotFound
+
+logger = logging.getLogger(__name__)
 
 
 class Parser(Protocol):
@@ -24,14 +27,18 @@ class ImportParser:
         for alias in node.names:
             mod_name = ModName.from_str(alias.name)
 
-            imported_mods.add(
-                DirectImport(
-                    mod_name=mod_name,
-                    path=mod_name.file_path,
-                    lineno=node.lineno,
-                    col_offset=node.col_offset,
+            try:
+                imported_mods.add(
+                    DirectImport(
+                        mod_name=mod_name,
+                        path=mod_name.file_path,
+                        lineno=node.lineno,
+                        col_offset=node.col_offset,
+                    )
                 )
-            )
+            except ModuleNotFound:
+                logger.warning(f"Could not find {mod_name} module. Could be an optional import. Skipping it")
+                continue
 
         return imported_mods
 
@@ -56,22 +63,41 @@ class ImportFromParser:
         if node.level >= 1:
             level_up = node.level
 
-            if mod_name.is_package:
-                level_up -= 1
+            try:
+                if mod_name.is_package:
+                    level_up -= 1
+            except ModuleNotFound:
+                return set()
 
-            base_module = [*mod_name.resolve(level_up).parts, node.module]
+            base_module = [*mod_name.resolve(level_up).parts]
+
+            if node.module:
+                # could be none in case of `from . import Field`
+                base_module.append(node.module)
 
         for alias in node.names:
-            mod_name, _ = ModName.from_object_path([*base_module, alias.name])
+            obj_path = [*base_module, alias.name]
 
-            imported_modules.add(
-                DirectImport(
-                    mod_name=mod_name,
-                    path=mod_name.file_path,
-                    lineno=node.lineno,
-                    col_offset=node.col_offset,
+            logger.debug(f"Analyzing {ModName.join(obj_path)} import")
+
+            try:
+                mod_name, obj = ModName.from_object_path(obj_path)
+
+                logger.debug(f"- {mod_name}, obj: {obj}")
+
+                imported_modules.add(
+                    DirectImport(
+                        mod_name=mod_name,
+                        path=mod_name.file_path,
+                        lineno=node.lineno,
+                        col_offset=node.col_offset,
+                    )
                 )
-            )
+            except ModuleNotFound:
+                logger.warning(
+                    f"Could not find {ModName.join(obj_path)} module. Could be an optional import. Skipping it"
+                )
+                continue
 
         return imported_modules
 

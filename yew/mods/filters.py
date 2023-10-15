@@ -1,9 +1,12 @@
+import logging
 import site
 import sys
 from pathlib import Path
 from typing import Set
 
 from yew.collections import DirectImport
+
+logger = logging.getLogger(__name__)
 
 
 class ImportFilter:
@@ -21,13 +24,16 @@ class ImportFilter:
         mod_name_str = str(direct_import.mod_name)
 
         if mod_name_str in sys.builtin_module_names:
+            logger.debug(f"skipping {mod_name_str} as a built-in module")
             return True
 
         if mod_name_str in sys.stdlib_module_names:
+            logger.debug(f"skipping {mod_name_str} as a stdlib module")
             return True
 
         for site_path in site.getsitepackages():
             if Path(site_path) in direct_import.path.parents:
+                logger.debug(f"skipping {mod_name_str} as a third-party module")
                 return True
 
         return False

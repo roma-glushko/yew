@@ -1,7 +1,16 @@
 import dataclasses
-import importlib
+import logging
+from importlib import util as importlib_util
 from pathlib import Path
 from typing import Dict, Final, List, Set, Tuple
+
+logger = logging.getLogger(__name__)
+
+
+class ModuleNotFound(Exception):
+    """
+    Raised when module spec is not found (this could be the case in optional imports)
+    """
 
 
 @dataclasses.dataclass(frozen=True)
@@ -24,9 +33,19 @@ class ModName:
 
     @property
     def file_path(self) -> Path:
-        mod_spec = importlib.util.find_spec(str(self))  # type: ignore[attr-defined]
+        mod_name = str(self)
 
-        if mod_spec.has_location:
+        try:
+            mod_spec = importlib_util.find_spec(mod_name)  # type: ignore[attr-defined]
+        except (ModuleNotFoundError, ValueError):
+            raise ModuleNotFound(f"Could not find package '{mod_name}' under Python path.") from None
+        except Exception as e:
+            raise ModuleNotFound(f"Could not import the module: {mod_name}") from e
+
+        if not mod_spec:
+            raise ModuleNotFound(f"Could not find package '{mod_name}' under Python path.")
+
+        if mod_spec.origin:
             return Path(mod_spec.origin)
 
         return Path(mod_spec.loader_state.filename)
@@ -38,6 +57,9 @@ class ModName:
         return file_path.stem == "__init__"
 
     def resolve(self, level_up: int) -> "ModName":
+        if not level_up:
+            return self
+
         return ModName(self._mod_parts[:-level_up])
 
     def __truediv__(self, part) -> "ModName":
@@ -67,24 +89,34 @@ class ModName:
         original_obj_path = [*object_path]
 
         try:
-            importlib.util.find_spec(cls.join(object_path))  # type: ignore[attr-defined]
+            if not importlib_util.find_spec(cls.join(object_path)):
+                raise ModuleNotFoundError
 
             return cls(object_path), None
         except ModuleNotFoundError:
+            # we have found an object import (e.g. constant, class, function, etc)
             pass
+        except Exception as e:
+            raise ModuleNotFound(f"Could not import the module: {original_obj_path}") from e
 
         object_name = object_path.pop()
 
         try:
-            importlib.util.find_spec(cls.join(object_path))  # type: ignore[attr-defined]
+            importlib_util.find_spec(cls.join(object_path))
 
             return cls(object_path), object_name
         except ModuleNotFoundError:
-            raise ModuleNotFoundError(f"{cls.join(original_obj_path)} could not be found") from None
+            raise ModuleNotFound(f"{cls.join(original_obj_path)} could not be found") from None
+        except Exception as e:
+            raise ModuleNotFound(f"Could not import the module: {original_obj_path}") from e
 
     @classmethod
     def join(cls, parts: List[str]) -> str:
-        return cls.SEP.join(parts)
+        try:
+            return cls.SEP.join(parts)
+        except TypeError:
+            logger.warning(f"Type error on joining module parts: {parts}")
+            raise
 
     @classmethod
     def split(cls, mod_name: str) -> List[str]:
@@ -193,3 +225,6 @@ class ModGraph:
 
         self._mods_by_file_path[module.file_path] = module
         self._mods_by_mod_name[module.mod_name] = module
+
+    def __repr__(self) -> str:
+        return f"ModGraph(modules={len(self._mods_by_file_path)})"

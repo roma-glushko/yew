@@ -1,7 +1,8 @@
+import logging
 import tokenize
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import List, Sequence, Set, Tuple
+from typing import List, Optional, Sequence, Set, Tuple
 
 from yew.collections import DirectImport, ModGraph, ModName
 from yew.mods.filters import ImportFilter
@@ -9,6 +10,8 @@ from yew.mods.finders import ModFinder
 from yew.mods.parsers import ModParser
 
 ParsedModuleFile = Tuple[ModName, Path, Set[DirectImport]]
+
+logger = logging.getLogger(__name__)
 
 
 def build_mod_graph(
@@ -30,16 +33,23 @@ def build_mod_graph(
         include_third_party=include_third_party,
     )
 
-    def process_module_file(file_path: Path) -> ParsedModuleFile:
+    def process_module_file(file_path: Path) -> Optional[ParsedModuleFile]:
         """
         Process an individual module file
         """
+        logger.debug(f"Parsing {file_path} file")
+
         mod_name = ModName.from_path(file_path)
 
         with tokenize.open(file_path) as file:
             content = file.read()
 
-        imported_mods = mod_parser.parse(mod_name, content)
+        try:
+            imported_mods = mod_parser.parse(mod_name, content)
+        except SyntaxError as e:
+            logger.warning(f"Syntax error in {file_path} file at {e.lineno}:{e.offset}: {e.msg}")
+            return None
+
         filtered_imports = mod_filter.filter(imported_mods)
 
         return mod_name, file_path, filtered_imports
@@ -51,7 +61,12 @@ def build_mod_graph(
             futures.append(executor.submit(process_module_file, file_path))
 
         for future in as_completed(futures):
-            mod_name, file_path, filtered_imports = future.result()
+            result = future.result()
+
+            if not result:
+                continue
+
+            mod_name, file_path, filtered_imports = result
 
             mod_graph.add(mod_name, file_path, filtered_imports)
 

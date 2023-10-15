@@ -1,6 +1,9 @@
+import logging
 import os
 from pathlib import Path
 from typing import Iterator, Sequence
+
+logger = logging.getLogger(__name__)
 
 
 class ModFinder:
@@ -30,19 +33,24 @@ class ModFinder:
 
                 for filename in files:
                     if self._ignore_file(filename):
-                        print(f"Ignored: {filename}")
                         continue
 
                     yield Path(dirpath) / filename
 
     def _ignore_file(self, filename: str) -> bool:
+        if not filename.endswith(".py"):
+            logger.debug(f"Ignoring {filename} as it doesn't have .py extension")
+            return True
+
         if self._is_hidden(filename):
+            logger.debug(f"Ignoring {filename} as a hidden file")
             return True
 
         if filename.count(".") > 1:
+            logger.debug(f"Ignoring {filename} as it contains a dot in the filename")
             return True
 
-        return not filename.endswith(".py")
+        return False
 
     def _is_hidden(self, file: str) -> bool:
         return file.startswith(".")
