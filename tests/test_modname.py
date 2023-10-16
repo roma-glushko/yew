@@ -25,8 +25,37 @@ def test__modname_hashable() -> None:
 @pytest.mark.parametrize(
     "path,module_name",
     [
-        (FIXTURE_DIR / "relative_imports" / "fields" / "json.py", "tests.fixtures.relative_imports.fields.json"),
+        (FIXTURE_DIR / "imports" / "fields" / "json.py", "tests.fixtures.imports.fields.json"),
+        (FIXTURE_DIR / "imports" / "fields" / "__init__.py", "tests.fixtures.imports.fields"),
+        (
+            FIXTURE_DIR / "imports" / "fields" / "security" / "password.py",
+            "tests.fixtures.imports.fields.security.password",
+        ),
     ],
 )
 def test__modname__from_path(path: Path, module_name: str) -> None:
-    assert module_name == str(ModName.from_path(path))
+    assert str(ModName.from_path(path)) == module_name
+
+
+@pytest.mark.parametrize(
+    "mod_name, expected_mod_name, expected_object_name",
+    [
+        (
+            ["tests", "fixtures", "imports", "fields", "security", "password", "PasswordField"],
+            "tests.fixtures.imports.fields.security.password",
+            "PasswordField",
+        ),
+        (
+            ["tests", "fixtures", "imports", "fields", "security", "password"],
+            "tests.fixtures.imports.fields.security.password",
+            None,
+        ),
+    ],
+)
+def test__modname__from_object_path(
+    mod_name: list[str], expected_mod_name: str, expected_object_name: str | None
+) -> None:
+    actual_mod_name, actual_obj_path = ModName.from_object_path(mod_name)
+
+    assert str(actual_mod_name) == expected_mod_name
+    assert actual_obj_path == expected_object_name

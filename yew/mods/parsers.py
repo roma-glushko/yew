@@ -1,14 +1,16 @@
 import ast
 import logging
-from typing import Any, Dict, List, Protocol, Set
+from typing import List, Protocol, Set
 
 from yew.collection import DirectImport, ModName, ModuleNotFound
 
 logger = logging.getLogger(__name__)
 
+NodeClass = type[ast.Import | ast.ImportFrom]
+
 
 class Parser(Protocol):
-    def __call__(self, module_name: ModName, node: ast.AST) -> Set[DirectImport]:
+    def __call__(self, module_name: ModName, node: ast.AST) -> set[DirectImport]:
         ...
 
 
@@ -16,13 +18,13 @@ class ImportParser:
     def __init__(self) -> None:
         ...
 
-    def __call__(self, mod_name: ModName, node: ast.AST) -> Set[DirectImport]:
+    def __call__(self, mod_name: ModName, node: ast.AST) -> set[DirectImport]:
         """
         Parse `import x` statements
         """
         assert isinstance(node, ast.Import)
 
-        imported_mods: Set[DirectImport] = set()
+        imported_mods: set[DirectImport] = set()
 
         for alias in node.names:
             mod_name = ModName.from_str(alias.name)
@@ -47,7 +49,7 @@ class ImportFromParser:
     def __init__(self) -> None:
         ...
 
-    def __call__(self, mod_name: ModName, node: ast.AST) -> Set[DirectImport]:
+    def __call__(self, mod_name: ModName, node: ast.AST) -> set[DirectImport]:
         """
         Parse `from x import ...` statements
         """
@@ -58,7 +60,7 @@ class ImportFromParser:
         base_module: List[str] = []
 
         if node.level == 0:
-            base_module = ModName.split(node.module)
+            base_module = ModName.split(str(node.module))
 
         if node.level >= 1:
             level_up = node.level
@@ -104,9 +106,9 @@ class ImportFromParser:
 
 class ModParser:
     def __init__(self) -> None:
-        self._parsers: Dict[Any, Parser] = {
-            ast.Import: ImportParser(),
-            ast.ImportFrom: ImportFromParser(),
+        self._parsers: dict[NodeClass, Parser] = {
+            ast.Import: ImportParser(),  # type: ignore[dict-item]
+            ast.ImportFrom: ImportFromParser(),  # type: ignore[dict-item]
         }
 
     def parse(self, module_name: ModName, content: str) -> Set[DirectImport]:

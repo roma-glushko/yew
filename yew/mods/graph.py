@@ -58,7 +58,9 @@ def build_mod_graph(
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
         for file_path in mod_finder.find(packages):
-            futures.append(executor.submit(process_module_file, file_path))
+            futures.append(
+                executor.submit(process_module_file, file_path),  # type: ignore[arg-type]
+            )
 
         for future in as_completed(futures):
             result = future.result()

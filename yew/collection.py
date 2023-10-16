@@ -3,7 +3,7 @@ import logging
 from collections import deque
 from importlib import util as importlib_util
 from pathlib import Path
-from typing import Deque, Dict, Final, List, Set, Tuple
+from typing import Any, Deque, Dict, Final, List, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ class ModName:
 
     def __truediv__(self, part) -> "ModName":
         if isinstance(part, ModName):
-            return ModName([*self._mod_parts, part.parts])
+            return ModName([*self._mod_parts, *part.parts])
 
         if isinstance(part, str):
             return ModName([*self._mod_parts, part])
@@ -87,10 +87,6 @@ class ModName:
         module_name_parts: Deque[str] = deque()
 
         while True:
-            # Break if we reach the root directory
-            if current_dir == current_dir.parent:
-                break
-
             # Get the base name of the current directory
             current_dir_name = current_dir.stem
 
@@ -150,8 +146,11 @@ class ModName:
     def __hash__(self) -> int:
         return hash(tuple(self._mod_parts))
 
-    def __eq__(self, mod_name: "ModName") -> bool:
-        return self._mod_parts == mod_name.parts
+    def __eq__(self, mod_name: Any) -> bool:
+        if isinstance(mod_name, ModName):
+            return self._mod_parts == mod_name.parts
+
+        raise NotImplementedError
 
     def __str__(self) -> str:
         return self.join(self._mod_parts)
@@ -217,8 +216,11 @@ class Module:
     def __hash__(self) -> int:
         return hash(self.mod_name)
 
-    def __eq__(self, module: "Module") -> bool:
-        return self.mod_name == module.mod_name
+    def __eq__(self, module: Any) -> bool:
+        if isinstance(module, Module):
+            return self.mod_name == module.mod_name
+
+        raise NotImplementedError
 
     def __repr__(self) -> str:
         repr: str = f"Module({self._mod_name}"
