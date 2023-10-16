@@ -2,7 +2,7 @@ import ast
 import logging
 from typing import Any, Dict, List, Protocol, Set
 
-from yew.collections import DirectImport, ModName, ModuleNotFound
+from yew.collection import DirectImport, ModName, ModuleNotFound
 
 logger = logging.getLogger(__name__)
 

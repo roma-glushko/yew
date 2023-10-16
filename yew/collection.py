@@ -1,8 +1,9 @@
 import dataclasses
 import logging
+from collections import deque
 from importlib import util as importlib_util
 from pathlib import Path
-from typing import Dict, Final, List, Set, Tuple
+from typing import Deque, Dict, Final, List, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -77,12 +78,36 @@ class ModName:
 
     @classmethod
     def from_path(cls, file_path: Path) -> "ModName":
-        mod_path = list(file_path.with_suffix("").parts)
+        file_path = file_path.absolute()
 
-        if mod_path[-1] == "__init__":
-            mod_path.pop()
+        file_name = file_path.stem
+        current_dir = file_path.parent
 
-        return cls(mod_path)
+        # Traverse up the package hierarchy and build the module name
+        module_name_parts: Deque[str] = deque()
+
+        while True:
+            # Break if we reach the root directory
+            if current_dir == current_dir.parent:
+                break
+
+            # Get the base name of the current directory
+            current_dir_name = current_dir.stem
+
+            # Break if there is no __init__.py in the current directory
+            if not (current_dir / "__init__.py").exists():
+                break
+
+            # Prepend the directory name to the module name list
+            module_name_parts.appendleft(current_dir_name)
+
+            # Move to the parent directory
+            current_dir = current_dir.parent
+
+        if file_name != "__init__":
+            module_name_parts.append(file_name)
+
+        return cls(list(module_name_parts))
 
     @classmethod
     def from_object_path(cls, object_path: List[str]) -> Tuple["ModName", str | None]:
@@ -122,6 +147,12 @@ class ModName:
     def split(cls, mod_name: str) -> List[str]:
         return mod_name.split(cls.SEP)
 
+    def __hash__(self) -> int:
+        return hash(tuple(self._mod_parts))
+
+    def __eq__(self, mod_name: "ModName") -> bool:
+        return self._mod_parts == mod_name.parts
+
     def __str__(self) -> str:
         return self.join(self._mod_parts)
 
@@ -138,6 +169,9 @@ class ImportContext:
     lineno: int
     col_offset: int
     module: "Module"
+
+    def __repr__(self) -> str:
+        return f"ImportContext('{self.module.mod_name}' at {self.lineno}:{self.col_offset})"
 
 
 class Module:
@@ -180,6 +214,22 @@ class Module:
 
         self._imports.update(imports)
 
+    def __hash__(self) -> int:
+        return hash(self.mod_name)
+
+    def __eq__(self, module: "Module") -> bool:
+        return self.mod_name == module.mod_name
+
+    def __repr__(self) -> str:
+        repr: str = f"Module({self._mod_name}"
+
+        if self._imports:
+            repr += f", import={len(self._imports)}"
+
+        repr += f", imported_by={len(self._imported_by)})"
+
+        return repr
+
 
 class ModGraph:
     """
@@ -191,9 +241,6 @@ class ModGraph:
         self._mods_by_mod_name: Dict[ModName, Module] = {}
 
         self._unmet_nodes: Dict[ModName, Module] = {}
-
-    def __getitem__(self, name: str | Path | ModName) -> Module | None:
-        ...
 
     def add(self, mod_name: ModName, file_path: Path, direct_imports: Set[DirectImport]) -> None:
         """
@@ -207,7 +254,9 @@ class ModGraph:
         mod_imports: Set[ImportContext] = set()
 
         for direct_import in direct_imports:
-            imported_module = self._mods_by_mod_name.get(direct_import.mod_name)
+            imported_module = self._mods_by_mod_name.get(direct_import.mod_name) or self._unmet_nodes.get(
+                direct_import.mod_name
+            )
 
             if not imported_module:
                 imported_module = Module(direct_import.mod_name, direct_import.path)
@@ -226,5 +275,20 @@ class ModGraph:
         self._mods_by_file_path[module.file_path] = module
         self._mods_by_mod_name[module.mod_name] = module
 
+    def __getitem__(self, name: str | Path | ModName) -> Module | None:
+        if isinstance(name, Path):
+            return self._mods_by_file_path.get(name)
+
+        if isinstance(name, ModName):
+            return self._mods_by_mod_name.get(name)
+
+        if module := self._mods_by_mod_name.get(ModName.from_str(name)):
+            return module
+
+        return self._mods_by_file_path.get(Path(name))
+
+    def __len__(self) -> int:
+        return len(self._mods_by_mod_name) + len(self._unmet_nodes)
+
     def __repr__(self) -> str:
-        return f"ModGraph(modules={len(self._mods_by_file_path)})"
+        return f"ModGraph(modules={len(self)})"

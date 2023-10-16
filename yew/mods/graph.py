@@ -4,7 +4,7 @@ from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import List, Optional, Sequence, Set, Tuple
 
-from yew.collections import DirectImport, ModGraph, ModName
+from yew.collection import DirectImport, ModGraph, ModName
 from yew.mods.filters import ImportFilter
 from yew.mods.finders import ModFinder
 from yew.mods.parsers import ModParser

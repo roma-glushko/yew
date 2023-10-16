@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from typing import Set
 
-from yew.collections import DirectImport
+from yew.collection import DirectImport
 
 logger = logging.getLogger(__name__)
 

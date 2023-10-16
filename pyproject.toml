@@ -8,17 +8,17 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = ">=3.10"
 
-[tool.poetry.extras]
-asyncio = ["aiofiles"]
-
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.6.0"
 ruff = "^0.0.292"
 black = "^23.9.1"
+pytest = "^7.4.2"
+coverage = "^7.3.2"
+pytest-cov = "^4.1.0"
 
 [tool.black]
 line-length = 120
-target-version = ['py39']
+target-version = ['py310']
 
 [tool.ruff]
 line-length = 120
