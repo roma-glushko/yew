@@ -19,6 +19,9 @@ pytest-cov = "^4.1.0"
 [tool.black]
 line-length = 120
 target-version = ['py310']
+exclude = '''
+tests/fixtures/syntaxerrs
+'''
 
 [tool.ruff]
 line-length = 120

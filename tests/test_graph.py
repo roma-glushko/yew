@@ -25,7 +25,7 @@ def test__parser__imports() -> None:
 
         assert actual_module is not None
 
-        if actual_module.imports:
+        if actual_module.imports is not None:
             assert len(actual_module.imports) == expected_module.imports
         else:
             assert actual_module.imports == expected_module.imports
